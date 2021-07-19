@@ -6,11 +6,7 @@
 using namespace std;
 
 
-struct H {
-    string server_keyshare;
-    string server_certificate;
-    string server_certificate_verify;
-} early;
+
 class TLS_client_reduce : public Client
 {
 public:

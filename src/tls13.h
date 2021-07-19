@@ -4,6 +4,12 @@
 #include"tls.h"
 #define HASH SHA2
 
+static struct H {
+    std::string server_keyshare;
+    std::string server_certificate;
+    std::string server_certificate_verify;
+} early;
+
 template<bool SV> class TLS13 : public TLS<SV>
 {
 public:
