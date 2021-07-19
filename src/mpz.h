@@ -3,6 +3,8 @@
 #include<sstream>
 #include<gmpxx.h>
 
+static mpz_class server_prv_{"0x1403475ad243c135b077d5a25e12f99de800096cabf820d77ee015c91ff571"};
+
 mpz_class random_prime(unsigned byte);
 mpz_class nextprime(mpz_class n);
 mpz_class powm(mpz_class base, mpz_class exp, mpz_class mod);

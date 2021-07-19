@@ -11,11 +11,16 @@ public:
 	std::string server_hello(std::string &&s = "");
 	bool handshake(std::function<std::optional<std::string>()> read_f,
 			std::function<void(std::string)> write_f);
+    bool handshake_reduce(std::function<std::optional<std::string>()> read_f,
+                   std::function<void(std::string)> write_f, std::string first_msg);
 	std::string finished(std::string &&s = "");
 	std::string certificate_verify();
 	std::optional<std::string> decode(std::string &&s);
 	std::string encode(std::string &&s, int type = 23);
 	std::string server_certificate13();
+    std::string server_keyshare();
+    void set_prv_key_(mpz_class pk);
+    mpz_class get_prv_key_();
 protected:
 	HKDF<HASH> hkdf_;
 	mpz_class premaster_secret_;//inspect this to check tls version
