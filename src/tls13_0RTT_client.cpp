@@ -10,8 +10,9 @@ using namespace std;
 class TLS_client_reduce : public Client
 {
 public:
-    TLS_client_reduce(string ip, int port,string s) : Client{ip, port} {
+    TLS_client_reduce(string ip, int port,string s, early e) : Client{ip, port} {
         first_msg = s;
+        early_data = e;
         t.handshake_reduce(bind(&TLS_client_reduce::recv, this, 0),
                     bind(&TLS_client_reduce::send, this, placeholders::_1, 0), s);
     }
@@ -24,6 +25,7 @@ public:
 private:
     TLS13<CLIENT> t;
     string first_msg;
+    early early_data;
     int get_full_length(const string &s) {
         return s.size() < 5 ? 0 : static_cast<unsigned char>(s[3]) * 0x100
                                   + static_cast<unsigned char>(s[4]) + 5;
@@ -44,7 +46,7 @@ int main(int ac, char **av) {
     };
     if(!co.args(ac, av)) return 0;
 
-    TLS_client_reduce t{co.get<const char*>("ip"), co.get<int>("port"),"GET /"};
+    TLS_client_reduce t{co.get<const char*>("ip"), co.get<int>("port"),"GET /", early};
 
     for(int i=0; i<10000; i++) {
         t.encodeNsend("GET /");
