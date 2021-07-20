@@ -10,11 +10,11 @@ using namespace std;
 class TLS_client_reduce : public Client
 {
 public:
-    TLS_client_reduce(string ip, int port,string s, early e) : Client{ip, port} {
+    TLS_client_reduce(string ip, int port,string s, struct H e) : Client{ip, port} {
         first_msg = s;
         early_data = e;
         t.handshake_reduce(bind(&TLS_client_reduce::recv, this, 0),
-                    bind(&TLS_client_reduce::send, this, placeholders::_1, 0), s);
+                    bind(&TLS_client_reduce::send, this, placeholders::_1, 0), s, e);
     }
     void encodeNsend(string s) {
         send(t.encode(move(s)));
@@ -25,7 +25,7 @@ public:
 private:
     TLS13<CLIENT> t;
     string first_msg;
-    early early_data;
+    struct H early_data;
     int get_full_length(const string &s) {
         return s.size() < 5 ? 0 : static_cast<unsigned char>(s[3]) * 0x100
                                   + static_cast<unsigned char>(s[4]) + 5;
@@ -40,6 +40,7 @@ int main(int ac, char **av) {
     early.server_certificate = tmp.server_certificate13();
     early.server_certificate_verify = tmp.certificate_verify();
 
+    std::cout << std::hex<< std::setw(2) << std::setfill('0') << bnd2mpz((uint8_t*)(&early.server_keyshare[5]),(uint8_t*)(&early.server_keyshare[60])) << std::endl;
     CMDoption co{
             {"port", "port of the host", 4433},
             {"ip", "ip address of the host", "localhost"}
@@ -50,6 +51,7 @@ int main(int ac, char **av) {
 
     for(int i=0; i<10000; i++) {
         t.encodeNsend("GET /");
+        cout << "sending~" << endl;
         cout << *t.recvNdecode() << endl;}
 }
 

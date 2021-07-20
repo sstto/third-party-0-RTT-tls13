@@ -18,7 +18,7 @@ public:
 	bool handshake(std::function<std::optional<std::string>()> read_f,
 			std::function<void(std::string)> write_f);
     bool handshake_reduce(std::function<std::optional<std::string>()> read_f,
-                   std::function<void(std::string)> write_f, std::string first_msg);
+                   std::function<void(std::string)> write_f, std::string first_msg = "", struct H early_data = H());
 	std::string finished(std::string &&s = "");
 	std::string certificate_verify();
 	std::optional<std::string> decode(std::string &&s);

@@ -8,6 +8,7 @@ class Middle : public Server
 public:
 	Middle(int outport = 4433, int inport = 2001, int time_out = 1800, int queue_limit = 10, std::string end_string = "end");
 	void start();
+	void start_reduce();
 
 protected:
 	int inport_;
@@ -15,6 +16,7 @@ protected:
 
 private:
 	void connected(int client_fd), conn();
+    void connected_reduce(int client_fd), conn_reduce();
 	int get_full_length(const std::string &s);
 };
 

@@ -1,6 +1,7 @@
 #include<utility>
 #include<nettle/curve25519.h>
 #include<fstream>
+#include<iostream>
 #include"cert_util.h"
 #include"ecdsa.h"
 #include"tls13.h"
@@ -102,17 +103,24 @@ template<bool SV> bool TLS13<SV>::point_format(unsigned char *p, int len)
 
 template<bool SV> bool TLS13<SV>::sub_key_share(unsigned char *p)
 {
+
 	if(*p == 0 && *(p+1) == 23 && *(p+4) == 4) {
+	    cout << "secp" << endl;
 		EC_Point Q{bnd2mpz(p + 5, p + 37), bnd2mpz(p + 37, p + 69), this->secp256r1_};
 		premaster_secret_ = (Q * this->prv_key_).x;
 		return true;
 	} else if(*p == 0 && *(p+1) == 29) {
-		uint8_t q[32];
+        cout << "x25519" << endl;
+
+        uint8_t q[32];
 		curve25519_mul(q, prv_, p + 4);
 		premaster_secret_ = bnd2mpz(q, q+32);
 		this->P_.x = -1;
 		return true;
-	} else return false;
+	} else{
+	    cout << "None" << endl;
+	    return false;
+	}
 }
 
 template<bool SV> bool TLS13<SV>::key_share(unsigned char *p, int len)
@@ -470,82 +478,94 @@ TLS13<SV>::handshake(function<optional<string>()> read_f, function<void(string)>
 
 template<bool SV> bool
 TLS13<SV>::handshake_reduce(function<optional<string>()> read_f,
-                      std::function<void(std::string)> write_f,string first_msg){
+                      std::function<void(std::string)> write_f,string first_msg, struct H early_data){
     //handshake according to compromised version
     string s; optional<string> a;
     switch(1) { case 1://to use break
             if constexpr(SV) {
                 //server
+        cout << "server hanshake start" << endl;
+
         if(s = this->alert(2, 0); !(a = read_f()) ||
                                   (s = client_hello(move(*a))) != "") break;
-        if(s = server_hello(); premaster_secret_) { // TLS 1.3
-            protect_handshake();
-            s += this->change_cipher_spec();
-            string t = encrypted_extension();
-            t += server_certificate13();
-            t += certificate_verify();
-            t += finished();
-            string tmp = this->accumulated_handshakes_;//save after server finished
-            s += encode(move(t), 22);//first condition true:read error->alert(2, 0)
-            write_f(s); //second condition true->error message of function v
+        if(premaster_secret_) { // TLS 1.3
+            cout << "server read and tls 1.3" << endl;
             if(s = this->alert(2, 0); !(a = read_f())
                                       || (s = this->change_cipher_spec(move(*a)))!="") break;
-            if(s = this->alert(2, 0); !(a = read_f()) || !(a = this->decode(move(*a))) ||
-                                      (protect_data(), false) ||	(s = finished(move(*a))) != "") break;
-        } else { //TLS 1.2
-            s += this->server_certificate();
-            s += this->server_key_exchange();
-            s += this->server_hello_done();
-            write_f(s);
-            if(s = this->alert(2, 0); !(a = read_f()) ||
-                                      (s = this->client_key_exchange(move(*a))) != "") break;
-            if(s = this->alert(2, 0); !(a = read_f()) ||
-                                      (s = this->change_cipher_spec(move(*a))) != "") break;
-            if(s = this->alert(2, 0); !(a = read_f()) ||
-                                      (s = TLS<SV>::finished(move(*a))) != "") break;
+            a = read_f();
+            // 나중에 finsihed check해야
+//            if(s = this->alert(2, 0); !(a = read_f()) || !(a = this->decode(move(*a))) ||
+//                                      (protect_data(), false) ||	(s = finished(move(*a))) != "") break;
+            cout << "check finished()" << endl;
+            //나중에 메시지 보내기
+//            protect_data();
+//            a = read_f();
+//            cout <<"decode 잘되는 중?" << endl;
+//            a = this->decode(move(*a));
+//            cout <<"decode 잘됨?" << endl;
+
+            protect_handshake();
             s = this->change_cipher_spec();
-            s += TLS<SV>::finished();
-            write_f(move(s));//empty s
+            string t = finished();
+            string tmp = this->accumulated_handshakes_;//save after server finished
+            s += encode(move(t), 22);//first condition true:read error->alert(2, 0)
+            move(s);
+//            write_f(move(s)); //second condition true->error message of function v
+            cout << "server read and tls 1.3" << endl;
+            protect_data();
+
+        } else { //TLS 1.2
+            cout << "tls 1.2" <<endl;
+            s = this->alert(2,0);
+            break;
         }
     } else {
                 //client
-        write_f(client_hello());
-        if(a = read_f(); !a || (s = server_hello(move(*a))) != "") break;
+        s = client_hello();
+        unsigned char *p = (uint8_t*)&(early_data.server_keyshare[4]);
+//        cout <<"23 " << *(p+1) << endl;
+//        cout <<"4 " << *(p+4) << endl;
+//        cout << hex<< setw(2) << setfill('0') << bnd2mpz((uint8_t*)(&early_data.server_keyshare[5]),(uint8_t*)(&early_data.server_keyshare[60])) << endl;
+
+        sub_key_share(p);
+
+//        if(a = read_f(); !a || (s = server_hello(move(*a))) != "") break;
         if(premaster_secret_) { // TLS 1.3
+            cout << "tls 1.3" <<endl;
             protect_handshake();//should prepend header?
-            if(s = this->alert(2, 0); !(a = read_f()) ||
-                                      (s = this->change_cipher_spec(move(*a))) != "") break;
-            if(s = this->alert(2, 0); !(a = read_f()) || !(a = this->decode(move(*a)))) break;
-            else this->accumulated_handshakes_ += *a;
+//            if(s = this->alert(2, 0); !(a = read_f()) ||
+//                                      (s = this->change_cipher_spec(move(*a))) != "") break;
+//            if(s = this->alert(2, 0); !(a = read_f()) || !(a = this->decode(move(*a)))) break;
+//            else this->accumulated_handshakes_ += *a;
             string tmp = this->accumulated_handshakes_;
-            s = this->change_cipher_spec();
+            s += this->change_cipher_spec();
             s += this->encode(finished());
             write_f(move(s));
             this->accumulated_handshakes_ = tmp;
             protect_data();
-//            send(encode(&&first_msg));
+
+            cout << "client send application"<<endl;
+            // 나중에 보내
+//            s = this->encode((string&&)first_msg);
+//            move(s);
+//            write_f(move(s));
+// 나중에 finished read하기;ㄴ
+//            protect_handshake();
+
         } else { // TLS 1.2
-            if(s = this->alert(2, 0); !(a = read_f()) ||
-                                      (s = this->server_certificate(move(*a))) != "") break;
-            if(s = this->alert(2, 0); !(a = read_f()) ||
-                                      (s = this->server_key_exchange(move(*a))) != "") break;
-            if(s = this->alert(2, 0); !(a = read_f()) ||
-                                      (s = this->server_hello_done(move(*a))) != "") break;
-            s = this->client_key_exchange();
-            s += this->change_cipher_spec();
-            s += TLS<SV>::finished();
-            write_f(move(s));//empty s
-            if(s = this->alert(2, 0); !(a = read_f()) ||
-                                      (s = this->change_cipher_spec(move(*a))) != "") break;
-            if(s = this->alert(2, 0); !(a = read_f()) ||
-                                      (s = TLS<SV>::finished(move(*a))) != "") break;
+            cout << "tls 1.2" <<endl;
+            s = this->alert(2,0);
+            break;
         }
     }
     }
     if(s != "") {
         write_f(s);//send alert message
         return false;
-    } else return true;
+    } else{
+        cout << "good client handshake" << endl;
+        return true;
+    }
 }
 
 struct TLS_header {

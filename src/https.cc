@@ -35,6 +35,21 @@ void Middle::conn()
 	}
 }
 
+void Middle::conn_reduce()
+{
+    int cl_size = sizeof(client_addr);
+    vector<thread> v;
+    while(1) {
+        client_fd = accept(server_fd, (sockaddr*)&client_addr, (socklen_t*)&cl_size);
+        LOGI << "accepting " << client_fd << " fd" << endl;
+        if(client_fd == -1) LOGF << "accept() error" << endl;
+        else {//fork가 아니므로 client_fd가 변함.
+            v.emplace_back(thread{&Middle::connected_reduce, this, client_fd});
+            v.back().detach();
+        }
+    }
+}
+
 void Middle::start()
 {//middle server can be managed here
 	thread th{&Middle::conn, this};
@@ -50,6 +65,23 @@ void Middle::start()
 			cout << "time out set " << time_out << endl;
 		}
 	}
+}
+
+void Middle::start_reduce()
+{//middle server can be managed here
+    thread th{&Middle::conn_reduce, this};
+    th.detach();
+    string s;
+    cout << "starting middle server, enter '?' to see commands." << endl;
+    while(cin >> s) {
+        if(s == "end") break;
+        else if(s == "help" || s == "?")
+            cout << "end, timeout [sec]" << endl << "current timeout " << time_out << endl;
+        else if(s == "timeout") {
+            cin >> time_out;
+            cout << "time out set " << time_out << endl;
+        }
+    }
 }
 
 void Middle::connected(int fd)
@@ -70,5 +102,25 @@ void Middle::connected(int fd)
 		}
 	}
 	close(fd); 		LOGI << "closing connection " << fd << endl;
+}
+
+void Middle::connected_reduce(int fd)
+{//will be used in parallel
+    TLS13<SERVER> t;//TLS is decoupled from file descriptor
+    t.set_prv_key_(server_prv_);
+    LOGI << std::hex<< std::setw(2) << std::setfill('0') << t.get_prv_key_();
+    if(t.handshake_reduce(bind(&Middle::recv, this, fd),
+                   bind(&Middle::send, this, placeholders::_1, fd))) {
+        Client cl{"localhost", inport_};
+        while(1) {
+            if(auto a = recv(fd)) {
+                if(a = t.decode(move(*a))) cl.send(*a);//to inner server
+                else break;
+                if(auto b = cl.recv()) send(t.encode(move(*b)), fd);//to browser
+                else break;
+            } else break;
+        }
+    }
+    close(fd); 		LOGI << "closing connection " << fd << endl;
 }
 
