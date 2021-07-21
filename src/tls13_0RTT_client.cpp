@@ -40,7 +40,9 @@ int main(int ac, char **av) {
     early.server_keyshare = tmp.server_keyshare();
     early.server_certificate = tmp.server_certificate13();
     early.server_certificate_verify = tmp.certificate_verify();
-    std::cout << std::hex<< std::setw(2) << std::setfill('0') << bnd2mpz((uint8_t*)(&early.server_keyshare[5]),(uint8_t*)(&early.server_keyshare[60])) << std::endl;
+//        ================================debug==========================================
+//    std::cout << std::hex<< std::setw(2) << std::setfill('0') << bnd2mpz((uint8_t*)(&early.server_keyshare[5]),(uint8_t*)(&early.server_keyshare[60])) << std::endl;
+
     CMDoption co{
             {"port", "port of the host", 4433},
             {"ip", "ip address of the host", "localhost"}
@@ -49,9 +51,9 @@ int main(int ac, char **av) {
 
     TLS_client_reduce t{co.get<const char*>("ip"), co.get<int>("port"),"GET /", early};
 
-    for(int i=0; i<10000; i++) {
-        t.encodeNsend("GET /");
-        cout << "sending~" << endl;
-        cout << *t.recvNdecode() << endl;}
+//    for(int i=0; i<10000; i++) {
+//        t.encodeNsend("GET /");
+//        cout << "sending~" << endl;
+//        cout << *t.recvNdecode() << endl;}
 }
 
