@@ -530,9 +530,12 @@ TLS13<SV>::handshake_reduce(function<optional<string>()> read_f,
             a = read_f();
             a = this->decode(move(*a));
             if(a == "GET /"){
-                cout << "I understand GET /" << endl;
+                cout << "Server understands client's first msg GET /" << endl;
+                string second_msg = "I understand your first msg GET /";
+                s = this->encode(move(second_msg));
+                write_f(s);
             }else{
-                cout << "I don't understand GET /" << endl;
+                cout << "Server doesn't understand client's first msg GET /" << endl;
             }
 
         } else { //TLS 1.2
@@ -584,6 +587,10 @@ TLS13<SV>::handshake_reduce(function<optional<string>()> read_f,
 //            Add) server가 보낸 finished 읽기;
 //            aes key를 handshake traffic으로 해야함;
 //            protect_handshake();
+
+            a = read_f();
+            a = this->decode(move(*a));
+            cout << "server said : " << a.value() << endl;
 
         } else { // TLS 1.2
 //        ================================debug==========================================
@@ -682,7 +689,8 @@ template<bool SV> optional<string> TLS13<SV>::decode13(string &&s)
 //	    cout << "auth" << endl;
 
 		string r{p->encrypted_msg, p->encrypted_msg + msg_len};
-        cout << r <<endl;
+//        ================================debug==========================================
+//        cout << r <<endl;
 		while(r.back() == 0) r.pop_back();
 		if(r.back() == ALERT) {
 			this->alert(this->alert(r[0], r[1]));
