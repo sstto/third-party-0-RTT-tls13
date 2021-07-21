@@ -492,11 +492,14 @@ TLS13<SV>::handshake_reduce(function<optional<string>()> read_f,
             cout << "server read and tls 1.3" << endl;
             if(s = this->alert(2, 0); !(a = read_f())
                                       || (s = this->change_cipher_spec(move(*a)))!="") break;
-            a = read_f();
+//            a = read_f();
+//            move(*a);
             // 나중에 finsihed check해야
 //            if(s = this->alert(2, 0); !(a = read_f()) || !(a = this->decode(move(*a))) ||
 //                                      (protect_data(), false) ||	(s = finished(move(*a))) != "") break;
             cout << "check finished()" << endl;
+            protect_handshake();
+
             //나중에 메시지 보내기
 //            protect_data();
 //            a = read_f();
@@ -504,15 +507,16 @@ TLS13<SV>::handshake_reduce(function<optional<string>()> read_f,
 //            a = this->decode(move(*a));
 //            cout <<"decode 잘됨?" << endl;
 
-            protect_handshake();
-            s = this->change_cipher_spec();
-            string t = finished();
-            string tmp = this->accumulated_handshakes_;//save after server finished
-            s += encode(move(t), 22);//first condition true:read error->alert(2, 0)
-            move(s);
+//            protect_handshake();
+//            s = this->change_cipher_spec();
+//            string t = finished();
+//            string tmp = this->accumulated_handshakes_;//save after server finished
+//            s += encode(move(t), 22);//first condition true:read error->alert(2, 0)
+//            move(s);
 //            write_f(move(s)); //second condition true->error message of function v
             cout << "server read and tls 1.3" << endl;
             protect_data();
+            cout << "now protecting" << endl;
 
         } else { //TLS 1.2
             cout << "tls 1.2" <<endl;
@@ -522,6 +526,8 @@ TLS13<SV>::handshake_reduce(function<optional<string>()> read_f,
     } else {
                 //client
         s = client_hello();
+//        cout << "client hello : "<< this->get_content_type(s).first << endl;
+//        write_f(move(s));
         unsigned char *p = (uint8_t*)&(early_data.server_keyshare[4]);
 //        cout <<"23 " << *(p+1) << endl;
 //        cout <<"4 " << *(p+4) << endl;
@@ -538,18 +544,21 @@ TLS13<SV>::handshake_reduce(function<optional<string>()> read_f,
 //            if(s = this->alert(2, 0); !(a = read_f()) || !(a = this->decode(move(*a)))) break;
 //            else this->accumulated_handshakes_ += *a;
             string tmp = this->accumulated_handshakes_;
-            s += this->change_cipher_spec();
-            s += this->encode(finished());
+            s+= this->change_cipher_spec();
+//            s += this->encode(finished());
+            cout << "change_cipher_spec : "<< this->get_content_type(s).first << endl;
+
             write_f(move(s));
             this->accumulated_handshakes_ = tmp;
             protect_data();
 
             cout << "client send application"<<endl;
+
             // 나중에 보내
 //            s = this->encode((string&&)first_msg);
 //            move(s);
 //            write_f(move(s));
-// 나중에 finished read하기;ㄴ
+// 나중에 finished read하기;
 //            protect_handshake();
 
         } else { // TLS 1.2
@@ -618,29 +627,45 @@ template<bool SV> optional<string> TLS13<SV>::decode13(string &&s)
 		unsigned char encrypted_msg[];
 	} *p = (H*)s.data();
 	uint8_t seq[8];
+    cout << hex<< setw(2) << setfill('0') << struct2str(p) <<endl;
 
-	if(int type = this->get_content_type(s).first; type != APPLICATION_DATA) {
+    if(int type = this->get_content_type(s).first; type != APPLICATION_DATA) {
+
 		this->alert(this->alert(2, 10));
 		return {};//alert case
 	}
 	mpz2bnd(this->dec_seq_num_++, seq, seq + 8);
 	int msg_len = p->h1.get_length() - 16;//tag length 16
-	
-	this->aes_[!SV].aad((uint8_t*)p, 5);
+
+//    string a{p->encrypted_msg, p->encrypted_msg + msg_len};
+//    cout << a << endl;
+
+    this->aes_[!SV].aad((uint8_t*)p, 5);
 	this->aes_[!SV].xor_with_iv(seq);
 	auto auth = this->aes_[!SV].decrypt(p->encrypted_msg, msg_len);
-	this->aes_[!SV].xor_with_iv(seq);
+
+//    string b{p->encrypted_msg, p->encrypted_msg + msg_len};
+//    cout << b << endl;
+
+    this->aes_[!SV].xor_with_iv(seq);
 	if(equal(auth.begin(), auth.end(), p->encrypted_msg + msg_len)) {
+//    if(1){
+	    cout << "auth" << endl;
+
 		string r{p->encrypted_msg, p->encrypted_msg + msg_len};
+        cout << r <<endl;
 		while(r.back() == 0) r.pop_back();
 		if(r.back() == ALERT) {
 			this->alert(this->alert(r[0], r[1]));
 			return {};
 		}
 		r.pop_back();
+//		cout << r << endl;
 		return r;
 	} else {
-		this->alert(this->alert(2, 20));
+        cout << "not auth" << endl;
+
+        this->alert(this->alert(2, 20));
 		return {};//bad record mac
 	}
 }

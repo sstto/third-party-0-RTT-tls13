@@ -15,6 +15,7 @@ public:
         early_data = e;
         t.handshake_reduce(bind(&TLS_client_reduce::recv, this, 0),
                     bind(&TLS_client_reduce::send, this, placeholders::_1, 0), s, e);
+//        send(t.encode(move(s)));
     }
     void encodeNsend(string s) {
         send(t.encode(move(s)));
@@ -39,7 +40,6 @@ int main(int ac, char **av) {
     early.server_keyshare = tmp.server_keyshare();
     early.server_certificate = tmp.server_certificate13();
     early.server_certificate_verify = tmp.certificate_verify();
-
     std::cout << std::hex<< std::setw(2) << std::setfill('0') << bnd2mpz((uint8_t*)(&early.server_keyshare[5]),(uint8_t*)(&early.server_keyshare[60])) << std::endl;
     CMDoption co{
             {"port", "port of the host", 4433},
