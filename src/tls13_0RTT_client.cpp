@@ -51,9 +51,9 @@ int main(int ac, char **av) {
 
     TLS_client_reduce t{co.get<const char*>("ip"), co.get<int>("port"),"GET /", early};
 
-//    for(int i=0; i<10000; i++) {
-//        t.encodeNsend("GET /");
-//        cout << "sending~" << endl;
-//        cout << *t.recvNdecode() << endl;}
+    for(int i=0; i<10000; i++) {
+        t.encodeNsend("GET /");
+        cout << "sending~" << endl;
+        cout << *t.recvNdecode() << endl;}
 }
 

@@ -88,7 +88,9 @@ void Middle::connected(int fd)
 {//will be used in parallel
 	TLS13<SERVER> t;//TLS is decoupled from file descriptor
 	t.set_prv_key_(server_prv_);
-    LOGI << hex<< setw(2) << setfill('0') << t.get_prv_key_();
+//        ================================debug==========================================
+//    LOGI << hex<< setw(2) << setfill('0') << t.get_prv_key_();
+
 	if(t.handshake(bind(&Middle::recv, this, fd),
 			bind(&Middle::send, this, placeholders::_1, fd))) {
 		Client cl{"localhost", inport_};
@@ -108,7 +110,8 @@ void Middle::connected_reduce(int fd)
 {//will be used in parallel
     TLS13<SERVER> t;//TLS is decoupled from file descriptor
     t.set_prv_key_(server_prv_);
-    LOGI << std::hex<< std::setw(2) << std::setfill('0') << t.get_prv_key_();
+//        ================================debug==========================================
+//    LOGI << hex<< setw(2) << setfill('0') << t.get_prv_key_();
     if(t.handshake_reduce(bind(&Middle::recv, this, fd),
                    bind(&Middle::send, this, placeholders::_1, fd))) {
         Client cl{"localhost", inport_};

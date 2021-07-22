@@ -105,12 +105,14 @@ template<bool SV> bool TLS13<SV>::sub_key_share(unsigned char *p)
 {
 
 	if(*p == 0 && *(p+1) == 23 && *(p+4) == 4) {
-	    cout << "secp" << endl;
+//        ================================debug==========================================
+//	    cout << "secp" << endl;
 		EC_Point Q{bnd2mpz(p + 5, p + 37), bnd2mpz(p + 37, p + 69), this->secp256r1_};
 		premaster_secret_ = (Q * this->prv_key_).x;
 		return true;
 	} else if(*p == 0 && *(p+1) == 29) {
-        cout << "x25519" << endl;
+//        ================================debug==========================================
+//        cout << "x25519" << endl;
 
         uint8_t q[32];
 		curve25519_mul(q, prv_, p + 4);
@@ -489,26 +491,20 @@ TLS13<SV>::handshake_reduce(function<optional<string>()> read_f,
         if(s = this->alert(2, 0); !(a = read_f()) ||
                                   (s = client_hello(move(*a))) != "") break;
         if(premaster_secret_) { // TLS 1.3
+            string tmp = this->accumulated_handshakes_;
             protect_handshake();
 //        ================================debug==========================================
 //            cout << "server read and tls 1.3" << endl;
             if(s = this->alert(2, 0); !(a = read_f())
                                       || (s = this->change_cipher_spec(move(*a)))!="") break;
 //            Add) read client's finished msg
-//            if(s = this->alert(2, 0); !(a = read_f()) || !(a = this->decode(move(*a))) ||
-//                                      (protect_data(), false) ||	(s = finished(move(*a))) != "") break;
-
+            if(s = this->alert(2, 0); !(a = read_f()) || !(a = this->decode(move(*a))) ||
+                                      (protect_data(), false) ||	(s = finished(move(*a))) != "") break;
 //        ================================debug==========================================
-//            cout << "check finished()" << endl;
+            cout << "check finished()" << endl;
 
 
-//            Add) finished 보내기;
-//            s = this->change_cipher_spec();
-//            string t = finished();
-//            string tmp = this->accumulated_handshakes_;//save after server finished
-//            s += encode(move(t), 22);//first condition true:read error->alert(2, 0)
-//            move(s);
-//            write_f(move(s)); //second condition true->error message of function v
+
 
 
 //            Add) application data 받은거 다시 보내기;
@@ -526,58 +522,70 @@ TLS13<SV>::handshake_reduce(function<optional<string>()> read_f,
 //        ================================debug==========================================
 //            cout << "handshake finish" << endl;
 
-            protect_data();
+//            protect_data();
             a = read_f();
             a = this->decode(move(*a));
             if(a == "GET /"){
                 cout << "Server understands client's first msg GET /" << endl;
                 string second_msg = "I understand your first msg GET /";
                 s = this->encode(move(second_msg));
-                write_f(s);
+//                write_f(s);
             }else{
                 cout << "Server doesn't understand client's first msg GET /" << endl;
             }
 
+            //            Add) finished 보내기;
+//            this->accumulated_handshakes_ = tmp;
+
+            protect_handshake();
+            string tmp_second_application_data = this->accumulated_handshakes_;
+            s += this->change_cipher_spec();
+            string t = finished();
+            s += encode(move(t), 22);//first condition true:read error->alert(2, 0)
+            write_f(move(s)); //second condition true->error message of function v
+//            this->accumulated_handshakes_ = tmp_second_application_data;
+            protect_data();
         } else { //TLS 1.2
             cout << "tls 1.2" <<endl;
             s = this->alert(2,0);
             break;
         }
     } else {//client
-        s = client_hello();
+        s = client_hello(); // containing extension
 //        ================================debug==========================================
 //        cout << "client hello : "<< this->get_content_type(s).first << endl;
 
-        unsigned char *p = (uint8_t*)&(early_data.server_keyshare[4]);
 //        ================================debug==========================================
 //        cout <<"23 " << *(p+1) << endl;
 //        cout <<"4 " << *(p+4) << endl;
 //        cout << hex<< setw(2) << setfill('0') << bnd2mpz((uint8_t*)(&early_data.server_keyshare[5]),(uint8_t*)(&early_data.server_keyshare[60])) << endl;
 
-        sub_key_share(p);
+        unsigned char *p = (uint8_t*)&(early_data.server_keyshare[4]);
+        sub_key_share(p); // set premaster_secret_
 
         if(premaster_secret_) { // TLS 1.3
 //        ================================debug==========================================
 //            cout << "tls 1.3" <<endl;
 
             protect_handshake();
-
-            string tmp = this->accumulated_handshakes_;
+            string tmp_first_application_data = this->accumulated_handshakes_;
             s+= this->change_cipher_spec();
 //            Add) finished msg
-//            s += this->encode(finished());
+            s += this->encode(finished());
+            string tmp_second_application_data = this->accumulated_handshakes_;
+
 
 //        ================================debug==========================================
 //            cout << "change_cipher_spec : "<< this->get_content_type(s).first << endl;
 
 
 //            write_f(move(s));
-            this->accumulated_handshakes_ = tmp;
+            this->accumulated_handshakes_ = tmp_first_application_data;
             protect_data();
+            this->accumulated_handshakes_ = tmp_second_application_data;
 
 //        ================================debug==========================================
 //            cout << "client send application"<<endl;
-
 
 
 //            Add) first msg <= handshake 끝난 후 자체적으로 보내면 어떨까? 근데 finished read해야해서.. 여기서 보내야 하;
@@ -591,6 +599,17 @@ TLS13<SV>::handshake_reduce(function<optional<string>()> read_f,
             a = read_f();
             a = this->decode(move(*a));
             cout << "server said : " << a.value() << endl;
+
+            protect_handshake();
+            if(s = this->alert(2, 0); !(a = read_f())
+                                      || (s = this->change_cipher_spec(move(*a)))!="") break;
+//            if(s = this->alert(2, 0); !(a = read_f()) || !(a = this->decode(move(*a))) ||
+//                                      (protect_data(), false) ||	(s = finished(move(*a))) != "") break;
+            if(s = this->alert(2, 0); !(a = read_f()) || !(a = this->decode(move(*a)))
+                                                ||	(s = finished(move(*a))) != "") break;
+            protect_data();
+//        ================================debug==========================================
+            cout << "check finished()"<<endl;
 
         } else { // TLS 1.2
 //        ================================debug==========================================
