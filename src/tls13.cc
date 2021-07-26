@@ -280,7 +280,44 @@ template<bool SV> string TLS13<SV>::certificate_verify()
 	this->accumulated_handshakes_ += t;
 	return t;
 }
+template<bool SV> string TLS13<SV>::certificate_verify_reduce()
+{
+    SHA2 sha;//hash accumulated handshakes
+    auto a = sha.hash(this->accumulated_early_data_.begin(), this->accumulated_early_data_.end());
+    string t;
+    for(int i=0; i<64; i++) t += ' ';
+    t += "TLS 1.3, server CertificateVerify";
+    t += (uint8_t)0x0;
+    t.insert(t.end(), a.begin(), a.end());
+    a = sha.hash(t.begin(), t.end());//?
+    auto prv = 0xe8750c6f65b817f8937015b0ed18db0c5d9076c0c1cadb9215a9c0384f3350c2_mpz;
 
+    struct {
+        uint8_t type = 0x0f;
+        uint8_t length[3] = {0, 0, 74};
+        uint8_t signature[2] = {4, 3};//ecdsa sha256, 8 4 RSA SHA256 PSS
+        uint8_t len[2] = {0, 70};
+        uint8_t der[4] = {0x30, 68, 2, 32};
+    } h;
+    vector<uint8_t> R(32), S(32);
+    uint8_t der2[2] = {2, 32};
+
+    ECDSA ecdsa{this->G_, //sign with ECDSA
+                0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551_mpz};
+    auto [r, s] = ecdsa.sign(bnd2mpz(a.begin(), a.end()), private_key);
+    mpz2bnd(r, R.begin(), R.end());
+    mpz2bnd(s, S.begin(), S.end());
+    if(R[0] >= 0x80) {//in DER this means negative number
+        h.length[2]++; h.len[1]++; h.der[1]++; h.der[3]++; R.insert(R.begin(), 0);
+    }
+    if(S[0] >= 0x80) {
+        h.length[2]++; h.len[1]++; h.der[1]++; der2[1]++; S.insert(S.begin(), 0);
+    }
+    t = struct2str(h) + string{R.begin(), R.end()} + string{der2, der2 + 2} +
+        string{S.begin(), S.end()};
+//    this->accumulated_handshakes_ += t;
+    return t;
+}
 template<bool SV> void TLS13<SV>::protect_handshake()
 {//call after server hello
 	hkdf_.zero_salt();
@@ -483,6 +520,7 @@ TLS13<SV>::handshake_reduce(function<optional<string>()> read_f,
                       std::function<void(std::string)> write_f,string first_msg, struct H early_data){
     //handshake according to compromised version
     string s; optional<string> a;
+    this->accumulated_early_data_ = early_data.to_string();
     switch(1) { case 1://to use break
             if constexpr(SV) {//server
 //        ================================debug==========================================

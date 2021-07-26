@@ -8,6 +8,10 @@ static struct H {
     std::string server_keyshare;
     std::string server_certificate;
     std::string server_certificate_verify;
+
+    std::string to_string(){
+        return server_keyshare + server_certificate + server_certificate_verify;
+    }
 } early;
 
 template<bool SV> class TLS13 : public TLS<SV>
@@ -20,6 +24,7 @@ public:
     bool handshake_reduce(std::function<std::optional<std::string>()> read_f,
                    std::function<void(std::string)> write_f, std::string first_msg = "", struct H early_data = H());
 	std::string finished(std::string &&s = "");
+    std::string certificate_verify_reduce();
 	std::string certificate_verify();
 	std::optional<std::string> decode(std::string &&s);
 	std::string encode(std::string &&s, int type = 23);
@@ -37,6 +42,7 @@ protected:
 	bool server_ext(unsigned char *p);
 private:
 	uint8_t prv_[32], echo_id_[32];
+    std::string accumulated_early_data_;
 	static std::string ecdsa_certificate_;
 	void protect_data(), protect_handshake();
 	std::array<std::vector<uint8_t>, 2> set_aes(std::vector<uint8_t> salt,

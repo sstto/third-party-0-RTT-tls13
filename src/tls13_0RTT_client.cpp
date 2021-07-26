@@ -15,7 +15,6 @@ public:
         early_data = e;
         t.handshake_reduce(bind(&TLS_client_reduce::recv, this, 0),
                     bind(&TLS_client_reduce::send, this, placeholders::_1, 0), s, e);
-//        send(t.encode(move(s)));
     }
     void encodeNsend(string s) {
         send(t.encode(move(s)));
@@ -39,7 +38,7 @@ int main(int ac, char **av) {
     tmp.set_prv_key_(server_prv_);
     early.server_keyshare = tmp.server_keyshare();
     early.server_certificate = tmp.server_certificate13();
-    early.server_certificate_verify = tmp.certificate_verify();
+    early.server_certificate_verify = tmp.certificate_verify_reduce();
 //        ================================debug==========================================
 //    std::cout << std::hex<< std::setw(2) << std::setfill('0') << bnd2mpz((uint8_t*)(&early.server_keyshare[5]),(uint8_t*)(&early.server_keyshare[60])) << std::endl;
 
@@ -51,9 +50,10 @@ int main(int ac, char **av) {
 
     TLS_client_reduce t{co.get<const char*>("ip"), co.get<int>("port"),"GET /", early};
 
-    for(int i=0; i<10000; i++) {
-        t.encodeNsend("GET /");
-        cout << "sending~" << endl;
-        cout << *t.recvNdecode() << endl;}
+//    sending additional application data
+//    for(int i=0; i<10000; i++) {
+//        t.encodeNsend("GET /");
+//        cout << "sending~" << endl;
+//        cout << *t.recvNdecode() << endl;}
 }
 
